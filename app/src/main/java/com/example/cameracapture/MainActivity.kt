@@ -24,6 +24,7 @@ import com.amazonaws.regions.Regions
 import com.amazonaws.services.s3.AmazonS3Client
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
+import java.lang.Thread.sleep
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -60,6 +61,10 @@ class MainActivity : AppCompatActivity() {
         start_button.setOnClickListener {
 //            takePhoto() // (10 초마다 캡처 추가 전) 감상시작 버튼 클릭 시 전면 카메라 화면 캡처
 
+            Log.d("감상 시작 : ", SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.KOREA).format(System.currentTimeMillis()))
+//            takePhoto() // 감상 시작하자마자 캡처
+            sleep(10000)
+
             if (cameraThread != null) {
                 cameraThread!!.endThread()
             }
@@ -92,10 +97,24 @@ class MainActivity : AppCompatActivity() {
             while (!ended) {
                 var message: Message = Message.obtain()
                 message.what = WATCH_START
+    //            takePhoto()
+//                cameraHandler.sendMessage(message)
+
+    //            sleep(10000) // 10 초
+
+                takePhoto()
+                sleep(10000)
+                takePhoto()
+                sleep(10000)
+
+                takePhoto()
+                sleep(1000)
+                takePhoto()
+                sleep(1000)
                 takePhoto()
                 cameraHandler.sendMessage(message)
 
-                sleep(10000) // 10 초
+                sleep(8000)
             }
         }
     }
@@ -141,7 +160,7 @@ class MainActivity : AppCompatActivity() {
         // Create time-stamped output file to hold the image
         val photoFile = File(
             outputDirectory,
-            SimpleDateFormat(FILENAME_FORMAT, Locale.US
+            SimpleDateFormat(FILENAME_FORMAT, Locale.KOREA
             ).format(System.currentTimeMillis()) + ".jpg") // 이미지를 저장할 파일을 만든다.
 
         // Create output options object which contains file + metadata
