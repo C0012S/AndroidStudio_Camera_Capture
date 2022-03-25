@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
         start_button.setOnClickListener {
 //            takePhoto() // (10 초마다 캡처 추가 전) 감상시작 버튼 클릭 시 전면 카메라 화면 캡처
 
-            Log.d("감상 시작 : ", SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.KOREA).format(System.currentTimeMillis()))
+            Log.d("감상 시작 : ", SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.KOREAN).format(System.currentTimeMillis()))
 //            takePhoto() // 감상 시작하자마자 캡처
             sleep(10000)
 
@@ -102,16 +102,17 @@ class MainActivity : AppCompatActivity() {
 
     //            sleep(10000) // 10 초
 
-                takePhoto()
+                takePhoto("Emotion")
                 sleep(10000)
-                takePhoto()
+                takePhoto("Emotion")
                 sleep(10000)
+                takePhoto("Emotion")
 
-                takePhoto()
+                takePhoto("Eye")
                 sleep(1000)
-                takePhoto()
+                takePhoto("Eye")
                 sleep(1000)
-                takePhoto()
+                takePhoto("Eye")
                 cameraHandler.sendMessage(message)
 
                 sleep(8000)
@@ -153,14 +154,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun takePhoto() {
+    private fun takePhoto(s3Bucket_FolderName: String?) {
         // Get a stable reference of the modifiable image capture use case
         val imageCapture = imageCapture ?: return
 
         // Create time-stamped output file to hold the image
         val photoFile = File(
             outputDirectory,
-            SimpleDateFormat(FILENAME_FORMAT, Locale.KOREA
+            SimpleDateFormat(FILENAME_FORMAT, Locale.KOREAN
             ).format(System.currentTimeMillis()) + ".jpg") // 이미지를 저장할 파일을 만든다.
 
         // Create output options object which contains file + metadata
@@ -179,7 +180,7 @@ class MainActivity : AppCompatActivity() {
                     val msg = "Photo capture succeeded: $savedUri"
 //                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
-                    uploadWithTransferUtilty(photoFile.name, photoFile)
+                    uploadWithTransferUtilty(s3Bucket_FolderName, photoFile.name, photoFile)
 //                    photoFile.delete() // 파일 삭제는 되는 것 같으나 S3 Bucket에 업로드가 안 된다. // S3 Bucket에 업로드 되기 전에 파일이 삭제되는 것 같다.
                 }
             }
@@ -247,7 +248,7 @@ class MainActivity : AppCompatActivity() {
         private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
     }
 
-    fun uploadWithTransferUtilty(fileName: String?, file: File?) {
+    fun uploadWithTransferUtilty(s3Bucket_FolderName: String?, fileName: String?, file: File?) {
         val awsCredentials: AWSCredentials =
             BasicAWSCredentials("access_Key", "secret_Key") // IAM User의 (accessKey, secretKey)
         val s3Client = AmazonS3Client(awsCredentials, Region.getRegion(Regions.US_EAST_1))
@@ -255,7 +256,7 @@ class MainActivity : AppCompatActivity() {
             TransferUtility.builder().s3Client(s3Client).context(this.applicationContext).build()
         TransferNetworkLossHandler.getInstance(this.applicationContext)
         val uploadObserver =
-            transferUtility.upload("bucket_Name", fileName, file) // (bucket name, file 이름, file 객체)
+            transferUtility.upload("bucket_Name/" + s3Bucket_FolderName, fileName, file) // (bucket name, file 이름, file 객체)
         uploadObserver.setTransferListener(object : TransferListener {
             override fun onStateChanged(id: Int, state: TransferState) {
                 if (state === TransferState.COMPLETED) {
