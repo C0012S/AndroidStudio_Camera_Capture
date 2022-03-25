@@ -3,22 +3,32 @@ package com.example.cameracapture
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
 import android.util.Log
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.auth.BasicAWSCredentials
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferListener
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferNetworkLossHandler
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferState
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferUtility
+import com.amazonaws.regions.Region
+import com.amazonaws.regions.Regions
+import com.amazonaws.services.s3.AmazonS3Client
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+
 
 class MainActivity : AppCompatActivity() {
     private var cameraThread: CameraThread? = null
@@ -48,12 +58,13 @@ class MainActivity : AppCompatActivity() {
 
         // 감상시작 버튼 클릭
         start_button.setOnClickListener {
+//            takePhoto() // (10 초마다 캡처 추가 전) 감상시작 버튼 클릭 시 전면 카메라 화면 캡처
+
             if (cameraThread != null) {
                 cameraThread!!.endThread()
             }
             cameraThread = CameraThread()
             cameraThread!!.start()
-//            takePhoto()
         }
 
         outputDirectory = getOutputDirectory()
@@ -149,8 +160,13 @@ class MainActivity : AppCompatActivity() {
                     val msg = "Photo capture succeeded: $savedUri"
 //                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
+                    uploadWithTransferUtilty(photoFile.name, photoFile)
+//                    photoFile.delete() // 파일 삭제는 되는 것 같으나 S3 Bucket에 업로드가 안 된다. // S3 Bucket에 업로드 되기 전에 파일이 삭제되는 것 같다.
                 }
-            })
+            }
+        )
+
+//        photoFile.delete() // 여기서는 파일 삭제 안 된다.
     }
 
     private fun startCamera() {
@@ -210,5 +226,42 @@ class MainActivity : AppCompatActivity() {
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+    }
+
+    fun uploadWithTransferUtilty(fileName: String?, file: File?) {
+        val awsCredentials: AWSCredentials =
+            BasicAWSCredentials("access_Key", "secret_Key") // IAM User의 (accessKey, secretKey)
+        val s3Client = AmazonS3Client(awsCredentials, Region.getRegion(Regions.US_EAST_1))
+        val transferUtility =
+            TransferUtility.builder().s3Client(s3Client).context(this.applicationContext).build()
+        TransferNetworkLossHandler.getInstance(this.applicationContext)
+        val uploadObserver =
+            transferUtility.upload("bucket_Name", fileName, file) // (bucket name, file 이름, file 객체)
+        uploadObserver.setTransferListener(object : TransferListener {
+            override fun onStateChanged(id: Int, state: TransferState) {
+                if (state === TransferState.COMPLETED) {
+                    // Handle a completed upload
+                    Log.d("S3 Bucket ", "Upload Completed!")
+
+                    // S3 Bucket에 file 업로드 후 Emulator에서 삭제
+                    if (file != null) {
+                        file.delete()
+                        Log.d("Emulator : ", "파일 삭제")
+                    }
+                    else {
+                        Log.d("Emulator : ", "삭제할 파일이 없습니다.")
+                    }
+                }
+            }
+
+            override fun onProgressChanged(id: Int, current: Long, total: Long) {
+                val done = (current.toDouble() / total * 100.0).toInt()
+                Log.d("MYTAG", "UPLOAD - - ID: \$id, percent done = \$done")
+            }
+
+            override fun onError(id: Int, ex: java.lang.Exception) {
+                Log.d("MYTAG", "UPLOAD ERROR - - ID: \$id - - EX:$ex")
+            }
+        })
     }
 }
